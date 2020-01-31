@@ -12,13 +12,18 @@ int main() {
         if (fp == NULL ) {
 		printf("No such file\n");
 	} else {
-		ret = fgets(state,5,fp);
+		/* this function reads 5 characters,just a random long enough number,
+		 read the length or till new line or endof file is met, what ever comes first */
+		ret = fgets(state,5,fp); 
 		if (ret == NULL) {
                 	printf("the read failed\n");		
 		} else {
 		 	printf("The file string %s \n", state );
                         printf("read length %d \n", strlen(state) );
+ 			/* the strrchr() returns the final occuring pointer of the passed characted,
+			If the character is not found, the function returns a null pointer.*/
  			printf("last ocuurance of 0 %d \n",strrchr(state,'0')-state);
+
 			printf("last ocuurance of 1 %d \n",strrchr(state, '1')-state);
 		}
 	}

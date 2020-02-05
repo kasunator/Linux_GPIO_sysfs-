@@ -20,7 +20,22 @@
  int read_GPIO_state(int pin_num);
  int write_GPIO_output_state(int pin_num, int value);
 
+ void print_error(char func_name[], char failed_file_op[],
+ 	char failed_file_location[], char file_op_ret_val[],char failed_wrt_val[]);
 
+
+#ifdef TEST_ERROR_PRINT_FUNCTION
+/* test the debug print function */
+#define TEST_FUNCTION_NAME "test_exportPin"
+#define TEST_FAILED_FILE_OP "fopen"
+#define TEST_FAILED_FILE_LOCATION "/sys/class/gpio/export/unexport"
+#define TEST_FAILED_OP_RET_VAL   "-1"
+#define TEST_FAILED_WRT_VAL  "7"
+int main() {
+	print_error(TEST_FUNCTION_NAME, TEST_FAILED_FILE_OP, TEST_FAILED_FILE_LOCATION,
+  		TEST_FAILED_OP_RET_VAL, TEST_FAILED_WRT_VAL );
+}
+#endif //#ifdef TEST_ERROR_PRINT_FUNCTION
 
 #if 0
 int main() {
@@ -60,22 +75,22 @@ int main() {
 }
 #endif
 
-//#if 0
+#if 0
 int main() {
-  int ret;
+  	int ret;
 	printf("exporting pin\n");
 	exportPin(31);
 	set_GPIO_as_output(31);//this will aotmatically reset the gpio ouput state to 0
 	sleep(1);
-  ret =read_GPIO_state(31);
+  	ret =read_GPIO_state(31);
 	printf("ret was: %d\n", ret);
-  if (ret == 1 ) {//so this condition will never be set
-    write_GPIO_output_state(31,0);
+  	if (ret == 1 ) {//so this condition will never be set
+    		write_GPIO_output_state(31,0);
 	} else {
 		write_GPIO_output_state(31,1);
 	}
 }
-//#endif
+#endif
 /*
     int main(int argc, char *argv[]) {  }
     argc (ARGument Count) is int and stores number of command-line arguments passed by the user including the name of the program.
@@ -125,7 +140,7 @@ int set_GPIO_as_output(int pin_num) {
 	int ret_value;
 	char gpio_pin_file_string[strlen(GPIO_PIN_BANK_A_SUB_STRING)  + strlen("/direction")+2 ] ;
 
-  if (pin_num < 32) {
+  	if (pin_num < 32) {
   		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/direction",pin_num);
 	} else if(pin_num < 64) {
 		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/direction",pin_num);
@@ -139,18 +154,21 @@ int set_GPIO_as_output(int pin_num) {
 
 #endif
 	fp = fopen(gpio_pin_file_string,"w");
-  if (fp != NULL) {
+  	if (fp != NULL) {
 		ret_value = fprintf(fp,"out"); //On success, the total number of characters written is returned.
+#ifdef DEBUG
 		printf("ret_value: %d\n",ret_value);
+#endif //#ifdef DEBUG
 		if ( ret_value > 0 ) {
-			  fclose(fp);
-				return 0;
+			fclose(fp);
+			return 0;
 		} else {
-				fclose(fp);
-				return -1;
+			printf("error writing to file\n");
+			fclose(fp);
+			return -1;
 		}
 	} else {
-		printf("faile openning file:[%s]\n",gpio_pin_file_string);
+		printf("error faile openning file:[%s]\n",gpio_pin_file_string);
 		return -1;
 	}
 }
@@ -160,7 +178,7 @@ int set_GPIO_as_input(int pin_num) {
 	int ret_value;
 	char gpio_pin_file_string[strlen(GPIO_PIN_BANK_A_SUB_STRING) + strlen("/direction")+2 ] ;
 
-  if (pin_num < 32) {
+  	if (pin_num < 32) {
   		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/direction",pin_num);
 	} else if(pin_num < 64) {
 		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/direction",pin_num);
@@ -171,14 +189,15 @@ int set_GPIO_as_input(int pin_num) {
 	}
 #ifdef DEBUG
 	printf("DEBUG gpio_pin_file_string:[%s]\n",gpio_pin_file_string);
-
 #endif
 	fp = fopen(gpio_pin_file_string,"w");
-  if (fp != NULL) {
+  	if (fp != NULL) {
 		ret_value = fprintf(fp,"in");
 		if ( ret_value < 0) {
 			fclose(fp);
 		} else {
+			printf("error writing to file\n");
+			fclose(fp);
 			return -1;
 		}
 		return 0;
@@ -192,8 +211,8 @@ int read_GPIO_state(int pin_num) {
 	FILE* fp = NULL;
 	char state[3] = {0};
 	char gpio_pin_file_string[strlen(GPIO_PIN_BANK_A_SUB_STRING)+ strlen("/value") +2] ;
-  char* ret;
-  if (pin_num < 32) {
+  	char* ret;
+  	if (pin_num < 32) {
   		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/value",pin_num);
 	} else if (pin_num < 64) {
 		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/value",pin_num);
@@ -208,10 +227,12 @@ int read_GPIO_state(int pin_num) {
 #endif
 
 	fp = fopen(gpio_pin_file_string,"r");
-  if (fp != NULL) {
+  	if (fp != NULL) {
 		ret = fgets(state,3,fp);
+#ifdef DEBUG
 		printf("read state: %s \n",state);
-    if (ret != NULL ) {
+#endif //#ifdef DEBUG
+    		if (ret != NULL ) {
 			fclose(fp);
 			if(state[0] == '1') {
 				return 1;
@@ -221,6 +242,7 @@ int read_GPIO_state(int pin_num) {
 				return state[0];
 			}
 		} else {
+			printf("Error reading from file\n");
 			return -1;
 		}
 	} else {
@@ -234,10 +256,10 @@ int write_GPIO_output_state(int pin_num, int value){
 	FILE* fp = NULL;
 	char state[2] = {0};
 	char gpio_pin_file_string[strlen(GPIO_PIN_BANK_A_SUB_STRING)+ strlen("/value") +2];
-  char write_value;
+  	char write_value;
 	int ret;
-  if (pin_num < 32) {
-  	sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/value",pin_num);
+  	if (pin_num < 32) {
+  		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/value",pin_num);
 	} else if (pin_num < 64) {
 		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/value",pin_num);
 	} else if (pin_num < 98) {
@@ -251,22 +273,22 @@ int write_GPIO_output_state(int pin_num, int value){
 #endif
 
 	fp = fopen(gpio_pin_file_string,"w+");
-  if (fp != NULL) {
+  	if (fp != NULL) {
 		if(value ==0 )
 			write_value = '0';
 		else
 			write_value = '1';
-		printf("write value = %c \n", write_value);
+		//printf("write value = %c \n", write_value);
 		ret = fprintf(fp,"%c\n",write_value);
 		if ( ret < 0 ) {
-			printf("failed writing: [%c] \n", write_value );
+			printf("Error failed writing: [%c] \n", write_value );
 			return -1;
 		} else {
 			fclose(fp);
 			return ret;
 		}
 	} else {
-		printf("faile openning file:[%s]\n",gpio_pin_file_string);
+		printf("Error failed openning file:[%s]\n",gpio_pin_file_string);
 		return -1;
 	}
 }
@@ -274,30 +296,60 @@ int write_GPIO_output_state(int pin_num, int value){
 
 int exportPin(int pin_num) {
 	FILE* fp = NULL;
-
-
+	int ret;
         fp = fopen(GPIO_PIN_EXPORT_PATH,"w");
 	if ( fp != NULL) {//to make sure we didnt have a problem re opening the same file
 		fprintf(fp,"%d\n", pin_num);
 		fclose(fp);
 		return 0;
 	} else {
-		printf("fopen failed\n");
+		printf("Error file open failed\n");
 		return -1;
 	}
 }
 
+
 int unexportPin(int pin_num) {
 	FILE* fp = NULL;
+	int ret;
+	char function_name[] = "unexportPin";
 
-
-  fp = fopen(GPIO_PIN_UNEXPORT_PATH,"w");
+  	fp = fopen(GPIO_PIN_UNEXPORT_PATH,"w");
 	if ( fp != NULL) {//to make sure we didnt have a problem re opening the same file
 		fprintf(fp,"%d\n", pin_num);
-		fclose(fp);
-		return 0;
+		if ( ret < 0 ) {
+			printf("Error: function_name:%s] failed writing: [%c] \n", pin_num );
+			return -1;
+		} else {
+			fclose(fp);
+			return ret;
+		}
+
 	} else {
-		printf("fopen failed\n");
+		printf("Error file open failed\n");
 		return -1;
 	}
+}
+
+/* error reporting JSON structure
+""Error" : { 	"function name": "(string)my_function name",
+		"failed file operation": " (string)my_file operation function",
+		"failed file location": "(string)my_failed file location",
+		"failed file operation return value": "(string)my_file oepration return value";
+                "failed write value" : "(string) XX"
+	   }
+
+*/
+void print_error(char func_name[], char failed_file_op[],
+	char failed_file_location[], char file_op_ret_val[],char failed_wrt_val[]){
+	//char final_string[] ={};
+        //strncat(final_string," \"",)
+	printf( " \"function name\" : \"%s\" , \"failed file operation\" : \"%s\" , \"failed file location\" : \"%s\" , \"failed file operation return value\" : \"%s\", \"failed write value\" : \"%s\" \n" ,
+	func_name, failed_file_op, failed_file_location , file_op_ret_val, failed_wrt_val);
+	/*printf( " \"function name\"\: \"%s\" ,\"failed file operation\"\: \"%s\"
+	        ,\"failed file location\"\: \"%s\", \"failed file operation return value\"\: \"%s\", \"failed write value\"\: \"%s\" "
+		,func_name, failed_file_op , failed_file_location, file_op_ret_val, failed_wrt_val );*/
+
+
+
 }

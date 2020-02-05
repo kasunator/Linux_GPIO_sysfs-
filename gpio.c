@@ -163,12 +163,16 @@ int set_GPIO_as_output(int pin_num) {
 			fclose(fp);
 			return 0;
 		} else {
-			printf("error writing to file\n");
+			/*printf("error writing to file\n");*/
+			print_error("set_GPIO_as_output","fprintf",
+					gpio_pin_file_string, ret_value,0);
 			fclose(fp);
 			return -1;
 		}
 	} else {
-		printf("error faile openning file:[%s]\n",gpio_pin_file_string);
+		/*printf("error faile openning file:[%s]\n",gpio_pin_file_string);*/
+		print_error("set_GPIO_as_output","fopen",
+				gpio_pin_file_string, 0,0);
 		return -1;
 	}
 }
@@ -196,13 +200,17 @@ int set_GPIO_as_input(int pin_num) {
 		if ( ret_value < 0) {
 			fclose(fp);
 		} else {
-			printf("error writing to file\n");
+			/*printf("error writing to file\n");*/
+			print_error("set_GPIO_as_input","fprintf",
+					gpio_pin_file_string, ret_value,0);
 			fclose(fp);
 			return -1;
 		}
 		return 0;
 	} else {
-		printf("faile openning file:[%s]\n",gpio_pin_file_string);
+		/*printf("faile openning file:[%s]\n",gpio_pin_file_string);*/
+		print_error("set_GPIO_as_input","fopen",
+				gpio_pin_file_string, 0,0);
 		return -1;
 	}
 }
@@ -242,11 +250,16 @@ int read_GPIO_state(int pin_num) {
 				return state[0];
 			}
 		} else {
-			printf("Error reading from file\n");
+			/*printf("Error reading from file\n");*/
+			fclose(fp);
+			print_error("read_GPIO_state","fgets",
+					gpio_pin_file_string, ret,0);
 			return -1;
 		}
 	} else {
-		printf("faile openning file:[%s]\n",gpio_pin_file_string);
+		/*printf("faile openning file:[%s]\n",gpio_pin_file_string);*/
+		print_error("read_GPIO_state","fopen",
+				gpio_pin_file_string, 0,0);
 		return -1;
 	}
 
@@ -281,14 +294,19 @@ int write_GPIO_output_state(int pin_num, int value){
 		//printf("write value = %c \n", write_value);
 		ret = fprintf(fp,"%c\n",write_value);
 		if ( ret < 0 ) {
-			printf("Error failed writing: [%c] \n", write_value );
+			//printf("Error failed writing: [%c] \n", write_value );
+			print_error("write_GPIO_output_state","fprintf",
+					gpio_pin_file_string, ret,write_value);
+			fclsoe(fp);
 			return -1;
 		} else {
 			fclose(fp);
 			return ret;
 		}
 	} else {
-		printf("Error failed openning file:[%s]\n",gpio_pin_file_string);
+		/*printf("Error failed openning file:[%s]\n",gpio_pin_file_string);*/
+		print_error("write_GPIO_output_state","fopen",
+				gpio_pin_file_string, 0,0);
 		return -1;
 	}
 }
@@ -299,11 +317,21 @@ int exportPin(int pin_num) {
 	int ret;
         fp = fopen(GPIO_PIN_EXPORT_PATH,"w");
 	if ( fp != NULL) {//to make sure we didnt have a problem re opening the same file
-		fprintf(fp,"%d\n", pin_num);
-		fclose(fp);
-		return 0;
+		ret = fprintf(fp,"%d\n", pin_num);
+		if ( ret < 0 ){
+			print_error("unexportPin","fprintf",
+					GPIO_PIN_EXPORT_PATH, ret,pin_num);
+			fclose(fp);
+			return -1;
+		} else {
+			fclose(fp);
+			return 0;
+		}
+
 	} else {
-		printf("Error file open failed\n");
+		/*printf("Error file open failed\n");*/
+		print_error("exportPin","fopen",
+				GPIO_PIN_EXPORT_PATH, 0,0);
 		return -1;
 	}
 }
@@ -312,13 +340,16 @@ int exportPin(int pin_num) {
 int unexportPin(int pin_num) {
 	FILE* fp = NULL;
 	int ret;
-	char function_name[] = "unexportPin";
 
   	fp = fopen(GPIO_PIN_UNEXPORT_PATH,"w");
 	if ( fp != NULL) {//to make sure we didnt have a problem re opening the same file
-		fprintf(fp,"%d\n", pin_num);
+		ret = fprintf(fp,"%d\n", pin_num);
 		if ( ret < 0 ) {
-			printf("Error: function_name:%s] failed writing: [%c] \n", pin_num );
+			/*print_error(char func_name[], char failed_file_op[],
+				char failed_file_location[], char file_op_ret_val[],char failed_wrt_val[])*/
+			print_error("unexportPin","fprintf",
+					GPIO_PIN_UNEXPORT_PATH, ret,pin_num);
+			fclose(fp);
 			return -1;
 		} else {
 			fclose(fp);
@@ -326,7 +357,9 @@ int unexportPin(int pin_num) {
 		}
 
 	} else {
-		printf("Error file open failed\n");
+		/*printf("Error file open failed\n");*/
+		print_error("unexportPin","fopen,
+				GPIO_PIN_UNEXPORT_PATH, 0,0);
 		return -1;
 	}
 }
@@ -341,11 +374,17 @@ int unexportPin(int pin_num) {
 
 */
 void print_error(char func_name[], char failed_file_op[],
-	char failed_file_location[], char file_op_ret_val[],char failed_wrt_val[]){
+	char failed_file_location[], int file_op_ret_val,int failed_wrt_val){
 	//char final_string[] ={};
         //strncat(final_string," \"",)
-	printf( " \"function name\" : \"%s\" , \"failed file operation\" : \"%s\" , \"failed file location\" : \"%s\" , \"failed file operation return value\" : \"%s\", \"failed write value\" : \"%s\" \n" ,
-	func_name, failed_file_op, failed_file_location , file_op_ret_val, failed_wrt_val);
+	char* _str_ret[11];
+	sprintf(_str_ret,"%d",file_op_ret_val);
+
+	char* _str_wrt[11];
+	sprintf(_str_wrt,"%d",failed_wrt_val);
+
+	printf( " \"Error\" : \"function name\" : \"%s\" , \"failed file operation\" : \"%s\" , \"failed file location\" : \"%s\" , \"failed file operation return value\" : \"%s\", \"failed write value\" : \"%s\" \n" ,
+	func_name, failed_file_op, failed_file_location , _str_ret, _str_wrt);
 	/*printf( " \"function name\"\: \"%s\" ,\"failed file operation\"\: \"%s\"
 	        ,\"failed file location\"\: \"%s\", \"failed file operation return value\"\: \"%s\", \"failed write value\"\: \"%s\" "
 		,func_name, failed_file_op , failed_file_location, file_op_ret_val, failed_wrt_val );*/

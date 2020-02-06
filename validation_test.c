@@ -2,6 +2,7 @@
 #include<string.h>
 #include<stdlib.h>
 #include "gpio.h"
+#include<stdint.h>
 
 
 unsigned int gpio_bank_A_Output_netlist[15] = {
@@ -133,6 +134,18 @@ enum GPIO_bank{
 	BANL_D
 };
 
+static int init_all_pins();
+static int _init_pins(enum GPIO_bank bank ,
+	unsigned int netlist[],int list_len, enum enum_pin_direction direction);
+
+static int _set_Output_net(enum GPIO_bank bank ,
+		unsigned int out_net, int pin_level);
+
+static int _get_input_net(enum GPIO_bank bank,
+		unsigned int in_net, int* in_net_reading);
+
+
+
 static int _init_pins(enum GPIO_bank bank ,
 	unsigned int netlist[],int list_len, enum enum_pin_direction direction  ){
 
@@ -163,6 +176,138 @@ static int _init_pins(enum GPIO_bank bank ,
 	}
 
 }
+/* this function is used to set a network of outputs belonging to a particular bank*/
+static int _set_Output_net(enum GPIO_bank bank ,
+	unsigned int out_net, int pin_level  ){
+
+	int i =0, pin_number, ret =0;
+	/* the out_net  is a 32 bit bit field  we have to
+	check which bits are set enabled in the net
+	by iterating through each bit */
+	for (i = 0 ; i < 32 ; i++) {
+
+		if ( out_net>>i & 0x01 ) {
+			pin_number = i+(bank*32); /*the pin number is a value between 0 and 127*/
+			ret = write_GPIO_output_state(pin_num, pin_level );
+			if (ret<0) {
+				printf("Error Setting out net\n");
+				return -1;
+			} else {
+				return 0;
+			}
+		}
+	}
+
+}
+
+static int _get_input_net(enum GPIO_bank bank,
+	unsigned int in_net, int* in_net_reading  ){
+
+	int i , pint_number,reading;
+	/* the in_net  is a 32 bit bit field  we have to
+	check which bits are set enabled in the net
+	by iterating through each bit */
+	for (i = 0 ; i < 32 ; i++) {
+
+		if ( in_net>>i & 0x01 ) {
+			pin_number = i+(bank*32); /*the pin number is a value between 0 and 127*/
+			ret = read_GPIO_state(pin_num, &reading );
+			if (ret < 0 ) {
+				printf("Error Setting out net\n");
+				return -1;
+			} else {
+				*in_net_reading = *reading;
+				return 0;
+			}
+		}
+	}
+}
+
+enum gpio_net_test_state {
+	TEST_STANDBY,
+	SET_OUT_NET_HIGH=0,
+	WAIT_FOR_HIGH_SETTLING_TIME,
+	READ_IN_NET_HIGH,
+	SET_OUT_NET_LOW,
+	WAIT_FOR_LOW_SETTLING_TIME,
+	READ_IN_NET_LOW,
+	END_TEST
+}
+
+static enum gpio_net_test_state test_state= TEST_STANDBY;
+static unsigned int test_index;
+static unsigned int *out_net, *in_net;
+static GPIO_bank bank_under_test;
+
+typedef struct {
+	uint8_t  start_test:1;
+	uint8_t  state_entering:1;
+	uint8_t  test_complete:1;
+}t_test_cntrl_flags;
+
+static t_test_cntrl_flags test_cntrl_flags = {
+	.start_test =0;
+	.state_entering =0;
+	.test_complete =0;
+}
+
+
+
+//static int _test_gpio_net_task(enum GPIO_bank bank, unsigned int netlist_index) {
+static int _test_gpio_net_task(enum GPIO_bank bank, unsigned int netlist_index) {
+
+	switch(test_state){
+	case TEST_STANDBY:
+		if ( test_cntrl_flags.start_test ==1 ) {
+			test_cntrl_flags.start_test =0;
+			if (bank_under_test == BANK_A){
+				out_net = gpio_bank_A_Output_netlist[test_index] ;
+				in_net = gpio_bank_A_Input_netlist[test_index];
+			} else if (bank_under_test == BANK_B) {
+				out_net = gpio_bank_A_Output_netlist[test_index] ;
+				in_net = gpio_bank_A_Input_netlist[test_index];
+			} else if (bank_under_test == BANK_C) {
+				out_net = gpio_bank_A_Output_netlist[test_index] ;
+				in_net = gpio_bank_A_Input_netlist[test_index];
+			} else if (bank_under_test == BANK_D) {
+				out_net = gpio_bank_A_Output_netlist[test_index] ;
+				in_net = gpio_bank_A_Input_netlist[test_index];
+			}
+			test_cntrl_flags.state_entering = 1;
+			test_state = SET_OUT_NET_HIGH;
+		}
+		break;
+	case SET_OUT_NET_HIGH:
+		if(test_cntrl_flags.state_entering ==1) {
+			test_cntrl_flags.state_entering = 0;
+			/*static int _set_Output_net(enum GPIO_bank bank ,
+				unsigned int out_net, int pin_level  )*/
+			_set_Output_net(bank_under_test, out_net, 1 );
+			test_cntrl_flags.state_entering = 1;
+			test_state = WAIT_FOR_HIGH_SETTLING_TIME;
+		}
+	
+		break;
+	case WAIT_FOR_HIGH_SETTLING_TIME:
+		break;
+	case READ_IN_NET_HIGH:
+		break;
+	case ET_OUT_NET_LOW:
+		break;
+	case WAIT_FOR_LOW_SETTLING_TIME;
+		break;
+	case READ_IN_NET_LOW:
+		break;
+	case END_TEST:
+		break;
+	default:
+		breaak;
+	}
+
+
+
+}
+
 
 static int init_all_pins(){
 	//init bank A inputs
@@ -170,6 +315,7 @@ static int init_all_pins(){
 	//init bank A outputs
 	_init_pins(BANK_A, gpio_bank_A_Output_netlist, sizeof(gpio_bank_A_Output_netlist), DIRECTION_OUTPUT );
 
+#if 0 //we test port A only for now
 	//init bank B inputs
 	_init_pins(BANK_B, gpio_bank_B_Input_netlist, sizeof(gpio_bank_B_Input_netlist), DIRECTION_INPUT );
 	//init bank B outputs
@@ -184,9 +330,12 @@ static int init_all_pins(){
 	_init_pins(BANK_D, gpio_bank_D_Input_netlist, sizeof(gpio_bank_D_Input_netlist), DIRECTION_INPUT );
 	//init bank D outputs
 	_init_pins(BANK_D, gpio_bank_D_Output_netlist, sizeof(gpio_bank_D_Output_netlist), DIRECTION_OUTPUT );
-
+#endif //#if 0
 }
 
+static int set_all_outputs_high() {
+
+}
 
 
 
@@ -238,17 +387,57 @@ int static _init_gpio_A_pins(){
 
 
 
-int main() {
-       int ret;
-	printf("exporting pin\n");
-	exportPin(31);
-	set_GPIO_as_output(31);
-        ret =read_GPIO_state(31);
-        if (ret == 1 ) {
-		printf("ret was 1 ");
-          	write_GPIO_output_state(31,0);
-	} else {
-		printf("ret was 0 ");
-		write_GPIO_output_state(31,1);
+i/*
+    int main(int argc, char *argv[]) {  }
+    argc (ARGument Count) is int and stores number of command-line arguments passed by the user including the name of the program.
+		So if we pass a value to a program, value of argc would be 2 (one for argument and one for program name)
+    The value of argc should be non negative.
+    argv(ARGument Vector) is array of character pointers listing all the arguments.
+    If argc is greater than zero,the array elements from argv[0] to argv[argc-1] will contain pointers to strings.
+    Argv[0] is the name of the program , After that till argv[argc-1] every element is command -line arguments.
+
+		we can call the ./executable_name arg1 arg2 arg3
+
+*/
+#if 0
+int main(int argc, char *argv[]) {
+
+	if ( argc  > 0) {
+		if( strncmp(argv[1],"write",5) == 0 ) {
+			printf("command 1 :write \n");
+			if( strncmp(argv[2],"1",1) == 0) {
+				printf("parm 1: 1\n");
+				write_GPIO_output_state(31,1);
+			} else if ( strncmp(argv[2],"1",0) == 0 ) {
+				printf("parm 1: 0\n");
+				write_GPIO_output_state(31,0);
+			}
+		} else if ( strncmp(argv[1],"read",4) == 0) {
+			printf("command 1 :read \n");
+			read_GPIO_state(31);
+		}
+	}
+}
+#endif
+
+int main(int argc, char *argv[]) {
+
+	if ( argc  > 0) {
+		if( strncmp(argv[1],"inti",4) == 0 ) {
+			printf("arg[1] :init \n");
+			init_all_pins();
+		} else if (strncmp(argv[1],"high",4) == 0 ) {
+			printf("arg[1] :high \n");
+
+		} else if (strncmp(argv[1],"low",4) == 0 ) {
+			printf("arg[1] :low \n");
+
+		} else if (strncmp(argv[1],"read",4) == 0 ) {
+			printf("arg[1] :read \n");
+
+		} else  {
+			printf("arg[1] :unknown command\n");
+
+		}
 	}
 }

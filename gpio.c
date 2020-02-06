@@ -199,6 +199,7 @@ int set_GPIO_as_input(int pin_num) {
 		ret_value = fprintf(fp,"in");
 		if ( ret_value < 0) {
 			fclose(fp);
+                        return 0;
 		} else {
 			/*printf("error writing to file\n");*/
 			print_error("set_GPIO_as_input","fprintf",
@@ -206,7 +207,7 @@ int set_GPIO_as_input(int pin_num) {
 			fclose(fp);
 			return -1;
 		}
-		return 0;
+
 	} else {
 		/*printf("faile openning file:[%s]\n",gpio_pin_file_string);*/
 		print_error("set_GPIO_as_input","fopen",
@@ -215,7 +216,7 @@ int set_GPIO_as_input(int pin_num) {
 	}
 }
 
-int read_GPIO_state(int pin_num) {
+int read_GPIO_state(int pin_num, int* read_value) {
 	FILE* fp = NULL;
 	char state[3] = {0};
 	char gpio_pin_file_string[strlen(GPIO_PIN_BANK_A_SUB_STRING)+ strlen("/value") +2] ;
@@ -243,10 +244,13 @@ int read_GPIO_state(int pin_num) {
     		if (ret != NULL ) {
 			fclose(fp);
 			if(state[0] == '1') {
+                                *read_value =1;
 				return 1;
 			} else if ( state[0] == '0') {
+                                *read_value =0;
 				return 0;
 			} else {
+                                *read_value =state[0];
 				return state[0];
 			}
 		} else {

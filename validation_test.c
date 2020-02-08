@@ -3,7 +3,8 @@
 #include<stdlib.h>
 #include "gpio.h"
 #include<stdint.h>
-
+#include<time.h>
+#include<errno.h>
 
 unsigned int gpio_bank_A_Output_netlist[15] = {
 	0x1,
@@ -108,8 +109,8 @@ unsigned int  gpio_bank_C_Input_netlist = {
 unsigned int  gpio_bank_D_Output_netlist = {
 	0x1,
 	0x2,
-	0x4,
-	0x8,
+	0x0,//0x4, edited for testing this is UART
+	0x0,//0x8, edited for testing this is UART
 	0x10,
 	0x20,
 	0x40};
@@ -117,8 +118,8 @@ unsigned int  gpio_bank_D_Output_netlist = {
 unsigned int   gpio_bank_D_Input_netlist = {
 	0x10000,
 	0x8000,
-	0x4000,
-	0x2000,
+	0x0,//0x4000, edited for testing this is UART
+	0x0,//0x2000, edited for testing this is UART
 	0x1000,
 	0x100,
 	0x80};
@@ -142,7 +143,7 @@ static int _set_Output_net(enum GPIO_bank bank ,
 		unsigned int out_net, int pin_level);
 
 static int _get_input_net(enum GPIO_bank bank,
-		unsigned int in_net, int* in_net_reading);
+		unsigned int in_net, unsigned int* in_net_reading);
 
 
 
@@ -201,7 +202,7 @@ static int _set_Output_net(enum GPIO_bank bank ,
 }
 
 static int _get_input_net(enum GPIO_bank bank,
-	unsigned int in_net, int* in_net_reading  ){
+	unsigned int in_net, unsigned int* in_net_reading  ){
 
 	int i , pint_number,reading;
 	/* the in_net  is a 32 bit bit field  we have to
@@ -216,12 +217,40 @@ static int _get_input_net(enum GPIO_bank bank,
 				printf("Error Setting out net\n");
 				return -1;
 			} else {
-				*in_net_reading = *reading;
-				return 0;
+				*in_net_reading |= (unsigned int)(*reading )<<i;
 			}
 		}
 	}
+
+       return *in_net_reading;
+
 }
+
+/*msec should be given in milliseconds */
+static int _msleep(long msec)
+{
+    struct timespec ts;
+    int res;
+
+    if (msec < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ts.tv_sec = msec / 1000;
+    ts.tv_nsec = (msec % 1000) * 1000000;
+
+    do {
+        res = nanosleep(&ts, &ts);
+    } while (res && errno == EINTR);
+
+    return res;
+}
+
+
+
+
 
 enum gpio_net_test_state {
 	TEST_STANDBY,
@@ -242,24 +271,50 @@ static GPIO_bank bank_under_test;
 typedef struct {
 	uint8_t  start_test:1;
 	uint8_t  state_entering:1;
+	uint8_t  test_in_progress:1;
 	uint8_t  test_complete:1;
 }t_test_cntrl_flags;
 
 static t_test_cntrl_flags test_cntrl_flags = {
 	.start_test =0;
 	.state_entering =0;
+	.test_in_progress =0;
 	.test_complete =0;
 }
+unsigned int input_high_reslt =0;
+unsigned int input_low_reslt =0;
+unsigned int test_result =0;
 
+static int _set_test_params(enum GPIO_bank bank, unsigned int netlist_index) {
 
+	bank_under_test = bank;
+	test_index = netlist_index;
+}
+
+static int _start_test(){
+	test_cntrl_flags.start_test =1;
+}
+
+static int _check_if_test_complet(){
+	return test_cntrl_flags.test_complete;
+}
+
+static int _check_if_test_in_progress(){
+	return test_cntrl_flags.test_complete;
+}
 
 //static int _test_gpio_net_task(enum GPIO_bank bank, unsigned int netlist_index) {
-static int _test_gpio_net_task(enum GPIO_bank bank, unsigned int netlist_index) {
+static int _test_gpio_net_task() {
 
 	switch(test_state){
 	case TEST_STANDBY:
 		if ( test_cntrl_flags.start_test ==1 ) {
 			test_cntrl_flags.start_test =0;
+			test_cntrl_flags.test_complete =0;
+			test_cntrl_flags.test_in_progress=1;
+			input_high_reslt =0;
+			input_low_reslt =0;
+			test_result =0;
 			if (bank_under_test == BANK_A){
 				out_net = gpio_bank_A_Output_netlist[test_index] ;
 				in_net = gpio_bank_A_Input_netlist[test_index];
@@ -282,23 +337,66 @@ static int _test_gpio_net_task(enum GPIO_bank bank, unsigned int netlist_index) 
 			test_cntrl_flags.state_entering = 0;
 			/*static int _set_Output_net(enum GPIO_bank bank ,
 				unsigned int out_net, int pin_level  )*/
-			_set_Output_net(bank_under_test, out_net, 1 );
+			_set_Output_net(bank_under_test, out_net, 1);
 			test_cntrl_flags.state_entering = 1;
 			test_state = WAIT_FOR_HIGH_SETTLING_TIME;
 		}
-	
+
 		break;
 	case WAIT_FOR_HIGH_SETTLING_TIME:
+		if (test_cntrl_flags.state_entering == 1) {
+			test_cntrl_flags.state_entering =0;
+			_msleep(100); // go to sleep for 100milli seconds
+			test_cntrl_flags.state_entering=1;
+			test_state = READ_IN_NET_HIGH;
+		}
 		break;
 	case READ_IN_NET_HIGH:
+		if(test_cntrl_flags.state_entering == 1){
+			test_cntrl_flags.state_entering =0;
+		 	_get_input_net(bank_under_test,
+					in_net, &input_high_reslt);
+			test_cntrl_flags.state_entering =1;
+			test_state = SET_OUT_NET_LOW;
+		}
 		break;
-	case ET_OUT_NET_LOW:
+	case SET_OUT_NET_LOW:
+		if(test_cntrl_flags.state_entering == 1) {
+			test_cntrl_flags.state_entering =0;
+			_set_Output_net(bank_under_test, out_net, 0);
+			test_cntrl_flags.state_entering = 1;
+			test_state = WAIT_FOR_LOW_SETTLING_TIME;
+		}
 		break;
 	case WAIT_FOR_LOW_SETTLING_TIME;
+		if (test_cntrl_flags.state_entering == 1) {
+			test_cntrl_flags.state_entering =0;
+			_msleep(100); // go to sleep for 100milli seconds
+			test_cntrl_flags.state_entering=1;
+			test_state = READ_IN_NET_LOW;
+		}
 		break;
 	case READ_IN_NET_LOW:
+		if(test_cntrl_flags.state_entering == 1){
+			test_cntrl_flags.state_entering =0;
+			_get_input_net(bank_under_test,
+					in_net, &input_low_reslt);
+			test_cntrl_flags.state_entering =1;
+			test_state = END_TEST;
+		}
 		break;
 	case END_TEST:
+		if(test_cntrl_flags.state_entering ==1 ){
+			test_cntrl_flags.state_entering=0;
+			if (input_high_reslt == in_net && input_low_reslt == 0 ) {
+				test_result=0;
+			} else {
+				test_result=-1;
+			}
+			test_cntrl_flags.test_in_progres=0;
+			test_cntrl_flags.test_complete = 1;
+			test_state= TEST_STANDBY;
+		}
 		break;
 	default:
 		breaak;
@@ -308,6 +406,10 @@ static int _test_gpio_net_task(enum GPIO_bank bank, unsigned int netlist_index) 
 
 }
 
+static int test_gpios(uinsinged int test_start_index, unsigned int test_end_index){
+	//check if everything is ready
+}
+
 
 static int init_all_pins(){
 	//init bank A inputs
@@ -315,7 +417,7 @@ static int init_all_pins(){
 	//init bank A outputs
 	_init_pins(BANK_A, gpio_bank_A_Output_netlist, sizeof(gpio_bank_A_Output_netlist), DIRECTION_OUTPUT );
 
-#if 0 //we test port A only for now
+//#if 0 //we test port A only for now
 	//init bank B inputs
 	_init_pins(BANK_B, gpio_bank_B_Input_netlist, sizeof(gpio_bank_B_Input_netlist), DIRECTION_INPUT );
 	//init bank B outputs
@@ -330,7 +432,7 @@ static int init_all_pins(){
 	_init_pins(BANK_D, gpio_bank_D_Input_netlist, sizeof(gpio_bank_D_Input_netlist), DIRECTION_INPUT );
 	//init bank D outputs
 	_init_pins(BANK_D, gpio_bank_D_Output_netlist, sizeof(gpio_bank_D_Output_netlist), DIRECTION_OUTPUT );
-#endif //#if 0
+//#endif //#if 0
 }
 
 static int set_all_outputs_high() {
@@ -338,56 +440,7 @@ static int set_all_outputs_high() {
 }
 
 
-
 /*
-
-int static _init_gpio_A_pins(){
-
- 	int outPutListLenght = sizeof(gpio_bank_A_Output_netlit) ;
- 	int inPutListLength = sizeof(gpio_bank_A_Input_netlist);
- 	int i =0, j =0, bit_count =0,func_ret =0, pin_number;
-
-		//first configure the output pins
-	for ( i =0 ; i < outPutListLength ; i++ ) {
-		//export the outputs
-		for( j =0 ; j < 32 ; j++) {
-			if ( (gpio_bank_A_Output_netlist[i]>>j) & 0x01 ) {//check it the jth bit is set
-				pin_number = j;
-				func_ret = exportPin(pin_number);
-				if ( func_ret > 0) {
-					func_ret = set_GPIO_as_output(pin_number);
-					if ( func_ret < 0 ) {
-						printf("error setting setting output pin as output")
-					}
-				} else {
-					printf("error exporting output pin");
-				}
-			}
-		}
-	}
-	//now configure the input pins
-	for ( i =0 ; i < inPutListLength ; i++ ) {
-		//export the outputs
-		for( j =0 ; j < 32 ; j++) {
-			if ( ((gpio_bank_A_Output_netlist[i]>>j) & 0x01) ) {//check it the jth bit is set
-				func_ret = exportPin(j);
-				if ( func_ret > 0) {
-					func_ret = set_GPIO_as_input(j);
-					if ( func_ret < 0 ) {
-						printf("error setting setting output pin as output")
-					}
-				} else {
-					printf("error exporting output pin");
-				}
-			}
-		}
-	}
-}
-*/
-
-
-
-i/*
     int main(int argc, char *argv[]) {  }
     argc (ARGument Count) is int and stores number of command-line arguments passed by the user including the name of the program.
 		So if we pass a value to a program, value of argc would be 2 (one for argument and one for program name)
@@ -399,26 +452,7 @@ i/*
 		we can call the ./executable_name arg1 arg2 arg3
 
 */
-#if 0
-int main(int argc, char *argv[]) {
 
-	if ( argc  > 0) {
-		if( strncmp(argv[1],"write",5) == 0 ) {
-			printf("command 1 :write \n");
-			if( strncmp(argv[2],"1",1) == 0) {
-				printf("parm 1: 1\n");
-				write_GPIO_output_state(31,1);
-			} else if ( strncmp(argv[2],"1",0) == 0 ) {
-				printf("parm 1: 0\n");
-				write_GPIO_output_state(31,0);
-			}
-		} else if ( strncmp(argv[1],"read",4) == 0) {
-			printf("command 1 :read \n");
-			read_GPIO_state(31);
-		}
-	}
-}
-#endif
 
 int main(int argc, char *argv[]) {
 

@@ -132,7 +132,7 @@ enum GPIO_bank{
 	BANK_A =0,
 	BANK_B,
 	BANK_C,
-	BANL_D
+	BANK_D
 };
 
 static int init_all_pins();
@@ -159,17 +159,18 @@ static int _init_pins(enum GPIO_bank bank ,
 			if ( (netlist[i]>>j) & 0x01 ) {//check it the jth bit is set
 				pin_number = j+(bank*32);
 				func_ret = exportPin(pin_number);
-				if ( func_ret > 0) {
+				if ( func_ret >= 0) {
 					if (direction == DIRECTION_INPUT)
 						func_ret = set_GPIO_as_input(pin_number);
 				 	else if (direction == DIRECTION_OUTPUT)
 						func_ret = set_GPIO_as_output(pin_number);
 					if ( func_ret < 0 )
-						printf("error setting setting output pin as output");
+					{
+						printf("error setting setting output pin as output\n");
 						return -1;
-
+					}
 				} else {
-					printf("error exporting output pin");
+					printf("error exporting output pin\n");
 					return -1;
 				}
 			}
@@ -265,7 +266,7 @@ enum gpio_net_test_state {
 
 static enum gpio_net_test_state test_state= TEST_STANDBY;
 static unsigned int test_index;
-static unsigned int *out_net, *in_net;
+static unsigned int out_net, in_net;
 static enum GPIO_bank bank_under_test;
 
 typedef struct {
@@ -452,32 +453,37 @@ static void _test_gpio_net_task(){
 
 
 
-static int test_gpios(uinsinged int test_start_index, unsigned int test_end_index){
+static int test_gpios(unsigned int test_start_index, unsigned int test_end_index){
 	//check if everything is ready
 }
 
 
 static int init_all_pins(){
 	//init bank A inputs
-	_init_pins(BANK_A, gpio_bank_A_Input_netlist, sizeof(gpio_bank_A_Input_netlist), DIRECTION_INPUT );
+	//_init_pins(BANK_A, gpio_bank_A_Input_netlist, sizeof(gpio_bank_A_Input_netlist), DIRECTION_INPUT );
+	_init_pins(BANK_A, gpio_bank_A_Input_netlist, 15, DIRECTION_INPUT );
 	//init bank A outputs
-	_init_pins(BANK_A, gpio_bank_A_Output_netlist, sizeof(gpio_bank_A_Output_netlist), DIRECTION_OUTPUT );
+	_init_pins(BANK_A, gpio_bank_A_Output_netlist, 15, DIRECTION_OUTPUT );
 
 //#if 0 //we test port A only for now
 	//init bank B inputs
-	_init_pins(BANK_B, gpio_bank_B_Input_netlist, sizeof(gpio_bank_B_Input_netlist), DIRECTION_INPUT );
+	//_init_pins(BANK_B, gpio_bank_B_Input_netlist, sizeof(gpio_bank_B_Input_netlist), DIRECTION_INPUT );
+	_init_pins(BANK_B, gpio_bank_B_Input_netlist, 13, DIRECTION_INPUT );
 	//init bank B outputs
-	_init_pins(BANK_B, gpio_bank_B_Output_netlist, sizeof(gpio_bank_B_Output_netlist), DIRECTION_OUTPUT );
-
+	//_init_pins(BANK_B, gpio_bank_B_Output_netlist, sizeof(gpio_bank_B_Output_netlist), DIRECTION_OUTPUT );
+	_init_pins(BANK_B, gpio_bank_B_Output_netlist, 13, DIRECTION_OUTPUT );
 	//init bank C inputs
-	_init_pins(BANK_C, gpio_bank_C_Input_netlist, sizeof(gpio_bank_C_Input_netlist), DIRECTION_INPUT );
+	//_init_pins(BANK_C, gpio_bank_C_Input_netlist, sizeof(gpio_bank_C_Input_netlist), DIRECTION_INPUT );
+	_init_pins(BANK_C, gpio_bank_C_Input_netlist, 16, DIRECTION_INPUT );
 	//init bank C outputs
-	_init_pins(BANK_C, gpio_bank_C_Output_netlist, sizeof(gpio_bank_C_Output_netlist), DIRECTION_OUTPUT );
-
+	//_init_pins(BANK_C, gpio_bank_C_Output_netlist, sizeof(gpio_bank_C_Output_netlist), DIRECTION_OUTPUT );
+	_init_pins(BANK_C, gpio_bank_C_Output_netlist, 16, DIRECTION_OUTPUT );
 	//init bank D inputs
-	_init_pins(BANK_D, gpio_bank_D_Input_netlist, sizeof(gpio_bank_D_Input_netlist), DIRECTION_INPUT );
+	//_init_pins(BANK_D, gpio_bank_D_Input_netlist, sizeof(gpio_bank_D_Input_netlist), DIRECTION_INPUT );
+	_init_pins(BANK_D, gpio_bank_D_Input_netlist, 7, DIRECTION_INPUT );
 	//init bank D outputs
-	_init_pins(BANK_D, gpio_bank_D_Output_netlist, sizeof(gpio_bank_D_Output_netlist), DIRECTION_OUTPUT );
+	//_init_pins(BANK_D, gpio_bank_D_Output_netlist, sizeof(gpio_bank_D_Output_netlist), DIRECTION_OUTPUT );
+	_init_pins(BANK_D, gpio_bank_D_Output_netlist, 7, DIRECTION_OUTPUT );
 //#endif //#if 0
 }
 
@@ -513,7 +519,7 @@ int main(int argc, char *argv[]) {
 			} else if (strncmp(argv[2],"D",1) == 0 ) {
 				bank_under_test = BANK_D;
 			}else {
-				printf("unknown bank:arg[2]= %c \n",argv[2]);
+				printf("unknown bank:arg[2]= %s \n",argv[2]);
 			}
 		} else if (strncmp(argv[1],"test",4) == 0 ) {
 			printf("arg[1] :test \n");

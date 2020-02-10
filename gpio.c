@@ -17,12 +17,13 @@
  int unexportPin(int pin_num);
  int set_GPIO_as_output(int pin_num);
  int set_GPIO_as_input(int pin_num);
- int read_GPIO_state(int pin_num);
+ /*int read_GPIO_state(int pin_num);*/
+ int read_GPIO_state(int pin_num, int* read_value);
  int write_GPIO_output_state(int pin_num, int value);
 
- void print_error(char func_name[], char failed_file_op[],
- 	char failed_file_location[], char file_op_ret_val[],char failed_wrt_val[]);
 
+void print_error(char func_name[], char failed_file_op[],
+	char failed_file_location[], int file_op_ret_val,int failed_wrt_val);
 
 #ifdef TEST_ERROR_PRINT_FUNCTION
 /* test the debug print function */
@@ -138,16 +139,21 @@ int main(int argc, char *argv[]) {
 int set_GPIO_as_output(int pin_num) {
 	FILE* fp = NULL;
 	int ret_value;
+        int bank_pin_num;
 	char gpio_pin_file_string[strlen(GPIO_PIN_BANK_A_SUB_STRING)  + strlen("/direction")+2 ] ;
 
   	if (pin_num < 32) {
-  		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/direction",pin_num);
+                bank_pin_num = pin_num;
+  		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/direction",bank_pin_num);
 	} else if(pin_num < 64) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/direction",pin_num);
-	} else if(pin_num < 98) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_C_SUB_STRING "%d/direction",pin_num);
+                bank_pin_num = pin_num -32;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/direction",bank_pin_num);
+	} else if(pin_num < 96) {
+                bank_pin_num = pin_num -64;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_C_SUB_STRING "%d/direction",bank_pin_num);
 	} else if(pin_num < 128) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_D_SUB_STRING "%d/direction",pin_num);
+                bank_pin_num = pin_num -96;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_D_SUB_STRING "%d/direction",bank_pin_num);
 	}
 #ifdef DEBUG
 	printf("DEBUG gpio_pin_file_string:[%s]\n",gpio_pin_file_string);
@@ -180,16 +186,21 @@ int set_GPIO_as_output(int pin_num) {
 int set_GPIO_as_input(int pin_num) {
 	FILE* fp = NULL;
 	int ret_value;
+        int bank_pin_num;
 	char gpio_pin_file_string[strlen(GPIO_PIN_BANK_A_SUB_STRING) + strlen("/direction")+2 ] ;
 
   	if (pin_num < 32) {
-  		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/direction",pin_num);
+                bank_pin_num = pin_num;
+  		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/direction",bank_pin_num);
 	} else if(pin_num < 64) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/direction",pin_num);
-	} else if(pin_num < 98) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_C_SUB_STRING "%d/direction",pin_num);
+                bank_pin_num = pin_num-32;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/direction",bank_pin_num);
+	} else if(pin_num < 96) {
+                bank_pin_num = pin_num-64;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_C_SUB_STRING "%d/direction",bank_pin_num);
 	} else if(pin_num < 128) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_D_SUB_STRING "%d/direction",pin_num);
+                bank_pin_num = pin_num-96;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_D_SUB_STRING "%d/direction",bank_pin_num);
 	}
 #ifdef DEBUG
 	printf("DEBUG gpio_pin_file_string:[%s]\n",gpio_pin_file_string);
@@ -199,13 +210,14 @@ int set_GPIO_as_input(int pin_num) {
 		ret_value = fprintf(fp,"in");
 		if ( ret_value < 0) {
 			fclose(fp);
-                        return 0;
+                        /*printf("error writing to file\n");*/
+                        print_error("set_GPIO_as_input","fprintf",
+                                        gpio_pin_file_string, ret_value,0);
+                        return -1;
 		} else {
-			/*printf("error writing to file\n");*/
-			print_error("set_GPIO_as_input","fprintf",
-					gpio_pin_file_string, ret_value,0);
+
 			fclose(fp);
-			return -1;
+			return 0;
 		}
 
 	} else {
@@ -219,16 +231,21 @@ int set_GPIO_as_input(int pin_num) {
 int read_GPIO_state(int pin_num, int* read_value) {
 	FILE* fp = NULL;
 	char state[3] = {0};
+        int bank_pin_num;
 	char gpio_pin_file_string[strlen(GPIO_PIN_BANK_A_SUB_STRING)+ strlen("/value") +2] ;
   	char* ret;
   	if (pin_num < 32) {
-  		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/value",pin_num);
+                bank_pin_num = pin_num;
+  		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/value",bank_pin_num);
 	} else if (pin_num < 64) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/value",pin_num);
-	} else if (pin_num < 98) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_C_SUB_STRING "%d/value",pin_num);
+                bank_pin_num = pin_num-32;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/value",bank_pin_num);
+	} else if (pin_num < 96) {
+                bank_pin_num = pin_num-64;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_C_SUB_STRING "%d/value",bank_pin_num);
 	} else if (pin_num < 128) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_D_SUB_STRING "%d/value",pin_num);
+                bank_pin_num = pin_num-96;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_D_SUB_STRING "%d/value",bank_pin_num);
 	}
 #ifdef DEBUG
 	printf("DEBUG gpio_pin_file_string :[%s]\n",gpio_pin_file_string);
@@ -257,7 +274,7 @@ int read_GPIO_state(int pin_num, int* read_value) {
 			/*printf("Error reading from file\n");*/
 			fclose(fp);
 			print_error("read_GPIO_state","fgets",
-					gpio_pin_file_string, ret,0);
+					gpio_pin_file_string, 0,0);
 			return -1;
 		}
 	} else {
@@ -272,17 +289,22 @@ int read_GPIO_state(int pin_num, int* read_value) {
 int write_GPIO_output_state(int pin_num, int value){
 	FILE* fp = NULL;
 	char state[2] = {0};
+        int bank_pin_num;
 	char gpio_pin_file_string[strlen(GPIO_PIN_BANK_A_SUB_STRING)+ strlen("/value") +2];
   	char write_value;
 	int ret;
   	if (pin_num < 32) {
-  		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/value",pin_num);
+                bank_pin_num = pin_num;
+  		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_A_SUB_STRING "%d/value",bank_pin_num);
 	} else if (pin_num < 64) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/value",pin_num);
-	} else if (pin_num < 98) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_C_SUB_STRING "%d/value",pin_num);
+                bank_pin_num = pin_num -32;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_B_SUB_STRING "%d/value",bank_pin_num);
+	} else if (pin_num < 96) {
+                bank_pin_num = pin_num -64;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_C_SUB_STRING "%d/value",bank_pin_num);
 	} else if (pin_num < 128) {
-		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_D_SUB_STRING "%d/value",pin_num);
+                bank_pin_num = pin_num -96;
+		sprintf(gpio_pin_file_string,GPIO_PIN_BANK_D_SUB_STRING "%d/value",bank_pin_num);
 	}
 #ifdef DEBUG
 	printf("DEBUG gpio_pin_file_string :[%s]\n",gpio_pin_file_string);
@@ -301,7 +323,7 @@ int write_GPIO_output_state(int pin_num, int value){
 			//printf("Error failed writing: [%c] \n", write_value );
 			print_error("write_GPIO_output_state","fprintf",
 					gpio_pin_file_string, ret,write_value);
-			fclsoe(fp);
+			fclose(fp);
 			return -1;
 		} else {
 			fclose(fp);
@@ -362,7 +384,7 @@ int unexportPin(int pin_num) {
 
 	} else {
 		/*printf("Error file open failed\n");*/
-		print_error("unexportPin","fopen,
+		print_error("unexportPin","fopen",
 				GPIO_PIN_UNEXPORT_PATH, 0,0);
 		return -1;
 	}
@@ -381,10 +403,10 @@ void print_error(char func_name[], char failed_file_op[],
 	char failed_file_location[], int file_op_ret_val,int failed_wrt_val){
 	//char final_string[] ={};
         //strncat(final_string," \"",)
-	char* _str_ret[11];
+	char _str_ret[11];
 	sprintf(_str_ret,"%d",file_op_ret_val);
 
-	char* _str_wrt[11];
+	char _str_wrt[11];
 	sprintf(_str_wrt,"%d",failed_wrt_val);
 
 	printf( " \"Error\" : \"function name\" : \"%s\" , \"failed file operation\" : \"%s\" , \"failed file location\" : \"%s\" , \"failed file operation return value\" : \"%s\", \"failed write value\" : \"%s\" \n" ,

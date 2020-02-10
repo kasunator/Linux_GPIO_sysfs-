@@ -40,7 +40,7 @@ unsigned int gpio_bank_A_Input_netlist[15] = {
 	0x20000,
 	0x10000};
 
-unsigned int  gpio_bank_B_Output_netlist = {
+unsigned int  gpio_bank_B_Output_netlist[13] = {
 	0x1,
 	0x2,
 	0x4,
@@ -55,7 +55,7 @@ unsigned int  gpio_bank_B_Output_netlist = {
 	0x20000,
 	0x40000};
 
-unsigned int  gpio_bank_B_Input_netlist = {
+unsigned int  gpio_bank_B_Input_netlist[13] = {
 	0x80000000,
 	0x40000000,
 	0x20000000,
@@ -70,7 +70,7 @@ unsigned int  gpio_bank_B_Input_netlist = {
 	0x100000,
 	0x80000};
 
-unsigned int  gpio_bank_C_Output_netlist = {
+unsigned int  gpio_bank_C_Output_netlist[16] = {
 	0x1,
 	0x2,
 	0x4,
@@ -88,7 +88,7 @@ unsigned int  gpio_bank_C_Output_netlist = {
 	0x4000,
 	0x8000};
 
-unsigned int  gpio_bank_C_Input_netlist = {
+unsigned int  gpio_bank_C_Input_netlist[16] = {
 	0x80000000,
 	0x40000000,
 	0x20000000,
@@ -106,7 +106,7 @@ unsigned int  gpio_bank_C_Input_netlist = {
 	0x20000,
 	0x10000};
 
-unsigned int  gpio_bank_D_Output_netlist = {
+unsigned int  gpio_bank_D_Output_netlist[7] = {
 	0x1,
 	0x2,
 	0x0,//0x4, edited for testing this is UART
@@ -115,7 +115,7 @@ unsigned int  gpio_bank_D_Output_netlist = {
 	0x20,
 	0x40};
 
-unsigned int   gpio_bank_D_Input_netlist = {
+unsigned int   gpio_bank_D_Input_netlist[7] = {
 	0x10000,
 	0x8000,
 	0x0,//0x4000, edited for testing this is UART
@@ -165,7 +165,7 @@ static int _init_pins(enum GPIO_bank bank ,
 				 	else if (direction == DIRECTION_OUTPUT)
 						func_ret = set_GPIO_as_output(pin_number);
 					if ( func_ret < 0 )
-						printf("error setting setting output pin as output")
+						printf("error setting setting output pin as output");
 						return -1;
 
 				} else {
@@ -189,7 +189,7 @@ static int _set_Output_net(enum GPIO_bank bank ,
 
 		if ( out_net>>i & 0x01 ) {
 			pin_number = i+(bank*32); /*the pin number is a value between 0 and 127*/
-			ret = write_GPIO_output_state(pin_num, pin_level );
+			ret = write_GPIO_output_state(pin_number, pin_level );
 			if (ret<0) {
 				printf("Error Setting out net\n");
 				return -1;
@@ -204,7 +204,7 @@ static int _set_Output_net(enum GPIO_bank bank ,
 static int _get_input_net(enum GPIO_bank bank,
 	unsigned int in_net, unsigned int* in_net_reading  ){
 
-	int i , pint_number,reading;
+	int i , pin_number,reading,ret;
 	/* the in_net  is a 32 bit bit field  we have to
 	check which bits are set enabled in the net
 	by iterating through each bit */
@@ -212,12 +212,12 @@ static int _get_input_net(enum GPIO_bank bank,
 
 		if ( in_net>>i & 0x01 ) {
 			pin_number = i+(bank*32); /*the pin number is a value between 0 and 127*/
-			ret = read_GPIO_state(pin_num, &reading );
+			ret = read_GPIO_state(pin_number, &reading );
 			if (ret < 0 ) {
 				printf("Error Setting out net\n");
 				return -1;
 			} else {
-				*in_net_reading |= (unsigned int)(*reading )<<i;
+				*in_net_reading |= ((unsigned int) reading )<<i;
 			}
 		}
 	}
@@ -261,12 +261,12 @@ enum gpio_net_test_state {
 	WAIT_FOR_LOW_SETTLING_TIME,
 	READ_IN_NET_LOW,
 	END_TEST
-}
+};
 
 static enum gpio_net_test_state test_state= TEST_STANDBY;
 static unsigned int test_index;
 static unsigned int *out_net, *in_net;
-static GPIO_bank bank_under_test;
+static enum GPIO_bank bank_under_test;
 
 typedef struct {
 	uint8_t  start_test:1;
@@ -276,11 +276,11 @@ typedef struct {
 }t_test_cntrl_flags;
 
 static t_test_cntrl_flags test_cntrl_flags = {
-	.start_test =0;
-	.state_entering =0;
-	.test_in_progress =0;
-	.test_complete =0;
-}
+	.start_test = 0,
+	.state_entering =0,
+	.test_in_progress =0,
+	.test_complete =0,
+};
 unsigned int input_high_reslt =0;
 unsigned int input_low_reslt =0;
 unsigned int test_result =0;
@@ -304,6 +304,7 @@ static int _check_if_test_in_progress(){
 }
 
 //static int _test_gpio_net_task(enum GPIO_bank bank, unsigned int netlist_index) {
+#if 0
 static int _test_gpio_net_task() {
 
 	switch(test_state){
@@ -405,6 +406,51 @@ static int _test_gpio_net_task() {
 
 
 }
+#endif
+
+static void _test_gpio_net_task(){
+
+	input_high_reslt =0;
+	input_low_reslt =0;
+	test_result =0;
+	//select the correct nets
+	if (bank_under_test == BANK_A){
+		out_net = gpio_bank_A_Output_netlist[test_index] ;
+		in_net = gpio_bank_A_Input_netlist[test_index];
+	} else if (bank_under_test == BANK_B) {
+		out_net = gpio_bank_A_Output_netlist[test_index] ;
+		in_net = gpio_bank_A_Input_netlist[test_index];
+	} else if (bank_under_test == BANK_C) {
+		out_net = gpio_bank_A_Output_netlist[test_index] ;
+		in_net = gpio_bank_A_Input_netlist[test_index];
+	} else if (bank_under_test == BANK_D) {
+		out_net = gpio_bank_A_Output_netlist[test_index] ;
+		in_net = gpio_bank_A_Input_netlist[test_index];
+	}
+	//now set the corresponding outputs for the net high
+	_set_Output_net(bank_under_test, out_net, 1);
+        //now go to sleep for 100 milliseconds so the outputs can settle
+	_msleep(100);
+	//now read the results of the input_low_results of the input_low_reslt
+	_get_input_net(bank_under_test,
+			in_net, &input_high_reslt);
+	//now set the outputs low
+        _set_Output_net(bank_under_test, out_net, 0);
+	//wait for the settling time
+	_msleep(100); // go to sleep for 100milli seconds
+	//now read the inputs again
+	_get_input_net(bank_under_test,
+			in_net, &input_low_reslt);
+	if (input_high_reslt == in_net && input_low_reslt == 0 ) {
+		test_result=0;
+		printf("test passed\n");
+	} else {
+		test_result=-1;
+		printf("test failed\n");
+	}
+}
+
+
 
 static int test_gpios(uinsinged int test_start_index, unsigned int test_end_index){
 	//check if everything is ready
@@ -435,10 +481,6 @@ static int init_all_pins(){
 //#endif //#if 0
 }
 
-static int set_all_outputs_high() {
-
-}
-
 
 /*
     int main(int argc, char *argv[]) {  }
@@ -460,15 +502,25 @@ int main(int argc, char *argv[]) {
 		if( strncmp(argv[1],"inti",4) == 0 ) {
 			printf("arg[1] :init \n");
 			init_all_pins();
-		} else if (strncmp(argv[1],"high",4) == 0 ) {
-			printf("arg[1] :high \n");
-
-		} else if (strncmp(argv[1],"low",4) == 0 ) {
-			printf("arg[1] :low \n");
-
+		} else if (strncmp(argv[1],"bank",4) == 0 ) {
+			printf("arg[1] :bank \n");
+			if (strncmp(argv[2],"A",1) == 0 ) {
+				bank_under_test = BANK_A;
+			} else if (strncmp(argv[2],"B",1) == 0 ) {
+				bank_under_test = BANK_B;
+			} else if (strncmp(argv[2],"C",1) == 0 ) {
+				bank_under_test = BANK_C;
+			} else if (strncmp(argv[2],"D",1) == 0 ) {
+				bank_under_test = BANK_D;
+			}else {
+				printf("unknown bank:arg[2]= %c \n",argv[2]);
+			}
+		} else if (strncmp(argv[1],"test",4) == 0 ) {
+			printf("arg[1] :test \n");
+			_test_gpio_net_task();
 		} else if (strncmp(argv[1],"read",4) == 0 ) {
 			printf("arg[1] :read \n");
-
+			_test_gpio_net_task();
 		} else  {
 			printf("arg[1] :unknown command\n");
 
